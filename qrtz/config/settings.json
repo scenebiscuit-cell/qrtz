@@ -1,0 +1,78 @@
+{
+  "render": {
+    "width": 1280,
+    "height": 720,
+    "fps": 60
+  },
+  "operator_screen": {
+    "preview_width": 640,
+    "preview_height": 360,
+    "pause_preview_when_idle": true,
+    "take_on_next_bar": true
+  },
+  "bpm_bands": [
+    { "name": "organic", "min_bpm": 0, "max_bpm": 100, "shader": "scene_organic.glsl" },
+    { "name": "flow", "min_bpm": 100, "max_bpm": 125, "shader": "scene_flow.glsl" },
+    { "name": "grid", "min_bpm": 125, "max_bpm": 135, "shader": "scene_grid.glsl" },
+    { "name": "shards", "min_bpm": 135, "max_bpm": 999, "shader": "scene_shards.glsl" }
+  ],
+  "scene_change": {
+    "crossfade_bars": 2,
+    "change_only_on_bar": true
+  },
+  "safety": {
+    "max_flashes_per_second": 3
+  },
+  "palettes": [
+    { "name": "placeholder_ember", "colors": ["#14070f", "#6a1b4d", "#e2522f", "#f6c453"] },
+    { "name": "placeholder_tide", "colors": ["#04121c", "#0e4d64", "#30b0c7", "#d8f3f0"] },
+    { "name": "placeholder_aura", "colors": ["#0d0a1f", "#4b2a8a", "#c56cf0", "#ffe3fa"] }
+  ],
+  "photo_deck": {
+    "folder": "images",
+    "extensions": ["jpg", "jpeg", "png", "tif", "tiff"],
+    "auto_advance_bars": 16,
+    "recolor_to_palette": true,
+    "crystal_warp_amount": 0.3,
+    "ripple_amount": 0.2,
+    "zoom_pulse_amount": 0.04,
+    "glitch_on_drop": true
+  },
+  "tempo": {
+    "prefer": "link",
+    "link_lost_after_sec": 3,
+    "audio_settle_sec": 10,
+    "bpm_multiplier": 1.0
+  },
+  "crystal": {
+    "marker_hsv_min": [0.0, 0.5, 0.4],
+    "marker_hsv_max": [0.08, 1.0, 1.0],
+    "sparkle_threshold": 0.85,
+    "spin_smoothing": 0.8
+  },
+  "gestures": {
+    "hold_sec": 0.5,
+    "palm_freeze_hold_sec": 2.0,
+    "pinch_distance": 0.05
+  },
+  "led": {
+    "serial_port": "COM3",
+    "baud": 115200,
+    "max_updates_per_sec": 30,
+    "brightness": 0.6
+  },
+  "midi": {
+    "device": "",
+    "map": {
+      "cc1": "intensity",
+      "cc2": "led_brightness",
+      "note36": "scene_next",
+      "note37": "palette_next",
+      "note38": "blackout"
+    }
+  },
+  "web": {
+    "port": 9990,
+    "pin": "change-me"
+  }
+}
