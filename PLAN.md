@@ -72,6 +72,45 @@ The software is free until you take paid gigs; the booth rig is a handful of low
 
 **Computers:** TouchDesigner runs on its own machine beside the booth, not the DJ's laptop. Link works over a local network, so bring a small travel router rather than trusting venue Wi-Fi. The RTX 3060 Ti machine is the better show computer (some TouchDesigner features are Nvidia-only); the RX 9070 desktop is fine for building.
 
+## Desk prototype: budget and build
+
+The goal is a demo under $100 that proves the core loop on a desk, before any booth gear: a crystal on a spinning base, a camera reading its light, the screen responding, and the LED ring matching the palette once M6 is in.
+
+**Budget** (rough US retail estimates from 2026; check current prices before buying):
+
+| Part | Est. cost | Notes |
+| --- | --- | --- |
+| TouchDesigner Non-Commercial | $0 | Free. Enough for the demo, capped at 1280×1280. |
+| Lazy-susan bearing (base) | $8–12 | Small, spins with one finger. |
+| Faceted acrylic crystal | $5–15 | Cheap and won't shatter. Skip K9 glass for the prototype. |
+| Addressable LED ring (WS2812, 16–24 LEDs) | $8–12 | Needed from M6. |
+| Arduino-compatible board (Nano or Uno clone) | $8–12 | Needed from M6. |
+| 5V power supply (about 2A) | $6–10 | Powers the LED ring, from M6. |
+| USB webcam | $0–25 | $0 if you already have one. |
+| Matte black foam board (backdrop) | $3–5 | Keeps the camera seeing only light in the glass. |
+| Clear top disc | $0 | A clear plastic lid works. The crystal sits on it and the LED ring shines up through it. |
+| Base board | $0 | Scrap wood or thick card, about 30 × 30 cm. |
+| Colored marker dot | $0 | A sticker on the bearing's top plate, for spin tracking (M5). |
+| Jumper wires, USB cable, tape or glue | $5–10 | Enough for a desk mount. |
+| **Total** | **about $45–90** | Under $100 with a new webcam. About $35–65 if you reuse one. |
+
+**To stay under $100:** leave out the LED ring and board until M6 (saves about $15–25), and reuse your webcam and desk lamp. Your lamp is not on the list.
+
+**Build steps:**
+
+1. Fix the bearing to the base board.
+2. From M6: fix the LED ring to the base board inside the bearing's open center, so the ring stays still while the bearing turns and its wires never twist. Check that the ring fits the opening before you buy (a 16-LED ring is about 4.5 cm across, a 24-LED ring about 6.6 cm).
+3. Lay the clear disc on the bearing and center the crystal on it.
+4. Put the black foam board 10–15 cm behind the crystal.
+5. Mount the webcam on a gooseneck or a stack of books, 25–40 cm away and a little above, framed on the crystal plus the space just above it, so a hand can enter the shot.
+6. Light the crystal with the desk lamp.
+7. Stick one small colored dot on the bearing's top plate for spin tracking (M5).
+8. Connect the webcam to the laptop and open the project (M1).
+
+A design version of this rig (exploded view, stages and test plan, signal flow) is on the "QRTZ Desk Prototype" canvas.
+
+**Demo clip:** film 15 seconds of a hand turning the base while the screen responds. That clip is what you show DJs and venues.
+
 ## How it works
 
 Eight modules, each its own `.tox`, pass data down through Null operators named `*_out`. The brain is the only module that makes decisions, so every other piece stays simple and swappable.
@@ -128,7 +167,7 @@ The DJ gets four ways to steer the visuals, and any of them works on its own. Ev
 | Open palm, held 2 seconds | MediaPipe hand tracking | Freeze the current frame until the palm lifts |
 | Link tempo and bar | Ableton Link CHOP | Beat pulses, scene changes on the bar, BPM band |
 | Ableton clips and knobs | TDAbleton | Launching a clip can switch scenes; a Live macro knob can drive any parameter |
-| Knobs and pads | Optional MIDI controller | Scene select, intensity, LED brightness, blackout |
+| Knobs and pads | Optional MIDI controller | Scene select, intensity, LED brightness, blackout, light mode (note 39) |
 | Phone page | Web Server DAT | Backup controls for you; palette votes for the crowd |
 
 Start with one camera framed on the crystal plus the space just above the dome, so it sees both the crystal and the DJ's hand. If the crystal shot needs to be tighter, add a second webcam for hands.
@@ -231,6 +270,21 @@ The crystal shapes the picture two ways at once: as an *image* that gets process
 
 Because the camera sees the LED ring's color through the glass, the crystal on the booth and the screens always share a color. That shared glow is what tells the crowd the crystal is driving the show.
 
+### Light modes: hanging crystal and kaleidoscope
+
+Two alternate looks sit on top of the scenes. The DJ picks one with MIDI note 39, the operator screen, or the phone page. They use the same crystal footage, so the crystal's spin and sparkle still drive them.
+
+- **Scene (default):** the BPM-band worlds described above.
+- **Hanging crystal:** the picture imagines the crystal hanging from a thread above a light. Light passing through its facets forms caustics (bright, curved lines where light focuses), rainbow dispersion at the edges, and a slow pendulum sway. The shader finds edges in `crystal_out` (brightness gradients) and reads the red, green and blue channels at slightly different offsets along them, which splits the light into color. A damped sway offsets the sampling point, and each beat kicks it.
+- **Kaleidoscope:** the crystal footage is mirrored into 3 to 12 wedges around the center. Spin angle rotates the wedges. Each beat gives a small zoom pulse, still held under the flash limiter.
+
+| Mode | Crystal reading | Beat | DJ control |
+| --- | --- | --- | --- |
+| Hanging crystal | Spin angle turns the light direction; sparkle adds glints | Pendulum kick | Dispersion (how strong the rainbows are) |
+| Kaleidoscope | Spin angle rotates the wedges; brightness sets wedge glow | Zoom pulse | Wedge count, 3 to 12 |
+
+Switching modes lands on the bar and cross-fades over one bar. If the camera drops, the modes run on crystal loops, the same fallback as the scenes.
+
 ## Repo structure
 
 The rule: keep everything an AI might edit in plain text files outside the `.toe`. TouchDesigner can link a Text DAT to a file on disk and keep the two in sync, and a component can be saved as its own external `.tox`. That gives Git real diffs and gives Copilot real files to edit.
@@ -258,7 +312,9 @@ qrtz/
 │  ├─ scene_organic.glsl
 │  ├─ scene_flow.glsl
 │  ├─ scene_grid.glsl
-│  └─ scene_shards.glsl
+│  ├─ scene_shards.glsl
+│  ├─ light_hanging.glsl     # hanging-crystal caustics and dispersion
+│  └─ light_kaleido.glsl     # kaleidoscope wedges
 ├─ firmware/led_ring/led_ring.ino   # Arduino sketch for the LED ring
 ├─ web/controller.html       # phone page (HTML/CSS/vanilla JS)
 ├─ images/                   # photo deck: drop JPG/PNG/TIFF here (not in Git)
@@ -275,14 +331,15 @@ The phone page and the Arduino sketch are small, self-contained files, which mak
 
 ## Build milestones
 
-Thirteen small steps, each testable on its own. Commit to Git after every one that works. M0 to M4 give you a desk demo; M5 to M10 make it booth-ready.
+Fourteen small steps, each testable on its own. Commit to Git after every one that works. M0 to M4 give you a desk demo; M5 to M10 make it booth-ready.
 
 - [ ] **M0 — Setup.** Install TouchDesigner (Non-Commercial key), VS Code, Node.js and the Arduino IDE. Clone this repo to `C:\Projects\qrtz`. Add the TouchDesigner MCP server to Claude Code. *Check:* ask Claude Code for the TouchDesigner build number; it answers from the running project.
-- [ ] **M1 — Crystal shot.** Build the rig on the desk: black backdrop, crystal on its base, a desk lamp for now. Video Device In → a Null TOP named `crystal_out`, autofocus and auto-exposure off. *Check:* turn the base slowly; the image stays sharp and the brightness doesn't pump.
+- [ ] **M1 — Crystal shot.** Build the desk prototype (see "Desk prototype" above): black backdrop, crystal on its bearing, a desk lamp for now. Video Device In → a Null TOP named `crystal_out`, autofocus and auto-exposure off. *Check:* turn the base slowly; the image stays sharp and the brightness doesn't pump; your parts receipts total under $100.
 - [ ] **M2 — Tempo.** Ableton Link CHOP plus lastBeatStanding as fallback, merged into `tempo_out` (beat, BPM, bar phase, source). Test with Ableton Live or any DJ app on the same machine. *Check:* set the app to 128 BPM; TouchDesigner reads 128 and `source` says link. Turn Link off; it switches to audio within 10 seconds.
 - [ ] **M3 — First scene.** One GLSL scene that uses `crystal_out` as its texture, pulses on the beat and changes scene only on the bar. *Check:* with music playing, pulses land on the kick and the crystal's sparkle is visible in the result.
 - [ ] **M4 — Palettes and BPM bands.** Palettes in `settings.json`; the brain picks a scene by BPM band and cross-fades over 2 bars. *Check:* move from 90 to 128 BPM; the scene changes within 4 bars with no hard cut.
 - [ ] **M4b — Photo deck.** Folder DAT on `images/`, double-buffered loading, Fit TOP, crystal warp and liquid ripple, palette recolor toggle, next image on the bar. *Check:* drop a new JPG into the folder mid-run; it joins the deck within a few seconds, and switching images never drops below 60 FPS.
+- [ ] **M4c — Light modes.** `light_hanging.glsl` (caustics, rainbow dispersion, pendulum sway kicked on each beat) and `light_kaleido.glsl` (3 to 12 wedges, spin-driven rotation), selected from `settings.json` with MIDI note 39. *Check:* the hanging mode shows rainbow edges that sway on the kick; the kaleidoscope with 6 wedges turns when the base turns (the spin tracking from M5 is needed for the turn, so the rotation can be faked with a slider until then); switching lands on the bar.
 - [ ] **M5 — Spin tracking.** Stick a small colored dot on the base; `crystal_track.py` outputs angle and spin speed. *Check:* one full turn by hand reads close to 360°; a still base reads spin speed near 0.
 - [ ] **M6 — LED ring.** Wire the ring to the board; `led_ring.ino` takes colors over serial; `led.tox` sends the palette. *Check:* changing the palette changes the ring within a quarter second.
 - [ ] **M7 — Hand gestures.** MediaPipe hands → `gestures.py` for height, pinch-hold and palm-hold, with hold timers. *Check:* reaching for a drink near the dome triggers nothing; a deliberate pinch-hold changes the palette every time.

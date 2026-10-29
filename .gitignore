@@ -1,0 +1,22 @@
+# TouchDesigner autosaves and incremental saves
+Backup/
+CrashAutoSave*
+*.[0-9]*.toe
+
+# Crystal video loops are large; keep them out of Git
+loops/*
+!loops/.gitkeep
+
+# Photo deck images are large and may be private
+images/*
+!images/.gitkeep
+
+# Python and tools
+__pycache__/
+*.pyc
+node_modules/
+
+# OS clutter
+Thumbs.db
+desktop.ini
+.DS_Store
