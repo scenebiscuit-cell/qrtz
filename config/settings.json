@@ -38,6 +38,26 @@
     "zoom_pulse_amount": 0.04,
     "glitch_on_drop": true
   },
+  "light_modes": {
+    "default": "scene",
+    "modes": ["scene", "hanging", "kaleidoscope"],
+    "switch_on_bar": true,
+    "crossfade_bars": 1,
+    "hanging": {
+      "dispersion": 0.02,
+      "caustic_strength": 1.0,
+      "sway_amount": 0.15,
+      "sway_damping": 0.9,
+      "sway_kick_on_beat": true
+    },
+    "kaleidoscope": {
+      "wedges": 6,
+      "wedges_min": 3,
+      "wedges_max": 12,
+      "beat_zoom": 0.05,
+      "rotation_gain": 1.0
+    }
+  },
   "tempo": {
     "prefer": "link",
     "link_lost_after_sec": 3,
@@ -68,7 +88,8 @@
       "cc2": "led_brightness",
       "note36": "scene_next",
       "note37": "palette_next",
-      "note38": "blackout"
+      "note38": "blackout",
+      "note39": "light_mode_next"
     }
   },
   "web": {
