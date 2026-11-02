@@ -6,7 +6,7 @@ base, hand gestures, MIDI and Ableton; tempo comes from Ableton Link (Rekordbox,
 Serato DJ Pro, Traktor Pro, Engine DJ, Ableton Live). Full plan: PLAN.md.
 
 ## Environment
-- TouchDesigner 2025.32280 or newer, Non-Commercial (max 1280x1280, render 1280x720)
+- TouchDesigner 2025.33230 (current official build, Sep 2026) or newer, Non-Commercial (max 1280x1280, render 1280x720)
 - Windows; give PowerShell commands and Windows paths. Repo lives at C:\Projects\qrtz
 - Python inside TouchDesigner (numpy available); GLSL TOP pixel shaders
 - Arduino sketch in firmware/ drives an addressable RGB LED ring over USB serial

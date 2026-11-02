@@ -48,11 +48,11 @@ The software is free until you take paid gigs; the booth rig is a handful of low
 
 | Item | Cost | Notes |
 | --- | --- | --- |
-| [TouchDesigner Non-Commercial](https://derivative.ca/UserGuide/Licensing) | Free | Output capped at 1280×1280; not allowed for paid work. Render at 1280×720 while prototyping. |
+| [TouchDesigner Non-Commercial](https://derivative.ca/UserGuide/Licensing) | Free | Use the current official build, 2025.33230 (Sep 2026), or newer. Output capped at 1280×1280; not allowed for paid work. Render at 1280×720 while prototyping. |
 | [TouchDesigner Commercial](https://derivative.ca/UserGuide/Licensing) | $600 one-time | Needed for paid gigs. One key, movable between computers. |
 | [Ableton Link CHOP](https://docs.derivative.ca/Ableton_Link_CHOP) | Built in | Tempo, bar ramp and beat pulses from any Link app on the network. |
 | [TDAbleton](https://docs.derivative.ca/TDAbleton) | Built in | Deeper Ableton Live control (clips, devices, tracks). Needs Live 11.1.5 or newer. |
-| [lastBeatStanding](https://derivative.ca/community-post/asset/last-beat-standing-rocksolid-ai-based-realtime-beat-detection/74246) | Free | Audio beat tracker. Fallback when the DJ isn't using Link. Needs TouchDesigner 2025.32280+. |
+| [lastBeatStanding](https://derivative.ca/community-post/asset/last-beat-standing-rocksolid-ai-based-realtime-beat-detection/74246) | Free | Audio beat tracker. Fallback when the DJ isn't using Link. Needs TouchDesigner 2025.32280 or newer, which the current build covers. |
 | [MediaPipe plugin](https://github.com/torinmb/mediapipe-touchdesigner) | Free, open source | Hand tracking for the DJ's gestures. One person at close range is what it does best. |
 | [Open Beat Control](https://github.com/Deep-Symmetry/open-beat-control) | Free, open source | Optional: reads beats from Pioneer CDJ networks and sends OSC, for booths with CDJs and no laptop. |
 
@@ -333,7 +333,7 @@ The phone page and the Arduino sketch are small, self-contained files, which mak
 
 Fourteen small steps, each testable on its own. Commit to Git after every one that works. M0 to M4 give you a desk demo; M5 to M10 make it booth-ready.
 
-- [ ] **M0 — Setup.** Install TouchDesigner (Non-Commercial key), VS Code, Node.js and the Arduino IDE. Clone this repo to `C:\Projects\qrtz`. Add the TouchDesigner MCP server to Claude Code. *Check:* ask Claude Code for the TouchDesigner build number; it answers from the running project.
+- [ ] **M0 — Setup.** Install TouchDesigner 2025.33230 or newer (Non-Commercial key), VS Code, Node.js and the Arduino IDE. Clone this repo to `C:\Projects\qrtz`. Add the TouchDesigner MCP server to Claude Code. *Check:* ask Claude Code for the TouchDesigner build number; it answers from the running project.
 - [ ] **M1 — Crystal shot.** Build the desk prototype (see "Desk prototype" above): black backdrop, crystal on its bearing, a desk lamp for now. Video Device In → a Null TOP named `crystal_out`, autofocus and auto-exposure off. *Check:* turn the base slowly; the image stays sharp and the brightness doesn't pump; your parts receipts total under $100.
 - [ ] **M2 — Tempo.** Ableton Link CHOP plus lastBeatStanding as fallback, merged into `tempo_out` (beat, BPM, bar phase, source). Test with Ableton Live or any DJ app on the same machine. *Check:* set the app to 128 BPM; TouchDesigner reads 128 and `source` says link. Turn Link off; it switches to audio within 10 seconds.
 - [ ] **M3 — First scene.** One GLSL scene that uses `crystal_out` as its texture, pulses on the beat and changes scene only on the bar. *Check:* with music playing, pulses land on the kick and the crystal's sparkle is visible in the result.
