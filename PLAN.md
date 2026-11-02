@@ -385,6 +385,7 @@ Write the remaining prompts the same way: point at PLAN.md, name the milestone, 
 - [Ableton Link CHOP](https://docs.derivative.ca/Ableton_Link_CHOP) — Derivative
 - [TDAbleton](https://docs.derivative.ca/TDAbleton) — Derivative
 - [TouchDesigner MCP Server guide, 2026](https://mcp.directory/blog/touchdesigner-mcp-complete-guide-2026) — mcp.directory
+- [touchdesigner-mcp on PyPI](https://pypi.org/project/touchdesigner-mcp/)
 - [lastBeatStanding beat detector](https://derivative.ca/community-post/asset/last-beat-standing-rocksolid-ai-based-realtime-beat-detection/74246) — Derivative community
 - [MediaPipe TouchDesigner plugin](https://github.com/torinmb/mediapipe-touchdesigner) — GitHub
 - [Rekordbox Ableton Link FAQ](https://rekordbox.com/pt/support/faq/ableton-link/) — rekordbox
