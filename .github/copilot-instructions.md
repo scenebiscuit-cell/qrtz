@@ -1,8 +1,10 @@
 # QRTZ (pronounced "quartz") — project rules for AI assistants
 
-Live visuals in TouchDesigner driven by a small lit crystal on the DJ booth.
-A camera on the crystal supplies the texture; the DJ steers it by spinning its
-base, hand gestures, MIDI and Ableton; tempo comes from Ableton Link (Rekordbox,
+A music visualizer in TouchDesigner where every image is light through a crystal.
+Standalone (built first): a virtual crystal refracts photos and paintings, driven
+by BPM, bass, mids, treble and drops. Crystal stage (added later): a camera on a
+small lit crystal on the DJ booth replaces the virtual one, and the DJ steers it
+by spinning its base and hand gestures. Tempo comes from Ableton Link (Rekordbox,
 Serato DJ Pro, Traktor Pro, Engine DJ, Ableton Live). Full plan: PLAN.md.
 
 ## Environment
@@ -14,7 +16,9 @@ Serato DJ Pro, Traktor Pro, Engine DJ, Ableton Live). Full plan: PLAN.md.
 ## Rules
 - All Python in scripts/*.py, synced to Text DATs. All GLSL in shaders/.
 - Each module is an external .tox in tox/. Never put logic only inside the .toe.
-- Module outputs are Null CHOPs/TOPs named *_out (crystal_out, tempo_out, hands_out).
+- Module outputs are Null CHOPs/TOPs named *_out (audio_out, tempo_out, crystal_out, hands_out).
+- Both crystals write the same crystal_out and the same numbers (angle, spin_speed, sparkle);
+  nothing downstream may care which crystal is live.
 - TouchDesigner only listens to Ableton Link tempo; it never sets it.
 - Every gesture needs a hold timer so passing hands don't trigger it.
 - Every input has a fallback; losing one never stops the output.
