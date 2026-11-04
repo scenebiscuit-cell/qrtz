@@ -64,17 +64,27 @@
     "camera_lost_after_sec": 2
   },
   "audio": {
-    "device": "",
+    "device": "Stereo Mix",
     "bands_hz": {
       "bass": [20, 150],
       "mids": [150, 2000],
       "treble": [4000, 16000]
     },
+    "filter_rolloff_db": 24,
+    "band_gain": {
+      "bass": 2,
+      "mids": 5,
+      "treble": 10
+    },
     "attack_sec": 0.05,
     "release_sec": 0.3,
     "drop_threshold": 1.8,
     "drop_window_sec": 4,
-    "drop_cooldown_bars": 8
+    "drop_short_window_sec": 2,
+    "drop_min_level": 0.01,
+    "drop_flag_hold_sec": 0.25,
+    "drop_cooldown_bars": 8,
+    "fallback_bpm": 128
   },
   "virtual_crystal": {
     "turn_bars": 8,
