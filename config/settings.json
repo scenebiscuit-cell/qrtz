@@ -58,6 +58,32 @@
       "rotation_gain": 1.0
     }
   },
+  "image_source": {
+    "mode": "auto",
+    "options": ["auto", "virtual", "camera"],
+    "camera_lost_after_sec": 2
+  },
+  "audio": {
+    "device": "",
+    "bands_hz": {
+      "bass": [20, 150],
+      "mids": [150, 2000],
+      "treble": [4000, 16000]
+    },
+    "attack_sec": 0.05,
+    "release_sec": 0.3,
+    "drop_threshold": 1.8,
+    "drop_window_sec": 4,
+    "drop_cooldown_bars": 8
+  },
+  "virtual_crystal": {
+    "turn_bars": 8,
+    "refraction": 0.25,
+    "dispersion": 0.015,
+    "bass_breathe": 0.08,
+    "treble_sparkle": 0.6,
+    "mids_drift": 0.3
+  },
   "tempo": {
     "prefer": "link",
     "link_lost_after_sec": 3,
@@ -89,7 +115,8 @@
       "note36": "scene_next",
       "note37": "palette_next",
       "note38": "blackout",
-      "note39": "light_mode_next"
+      "note39": "light_mode_next",
+      "note40": "image_source_next"
     }
   },
   "web": {
