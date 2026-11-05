@@ -137,12 +137,15 @@ def _current_bpm(cfg):
 
 
 def _read_rms(scriptOp):
-    """Raw level per band. A missing input reads as silence."""
+    """Raw level per band. A missing input reads as silence, and so does an
+    infinite or NaN reading, which would otherwise stay in the smoothing for
+    good. The filters can produce one when the audio device restarts."""
     source = scriptOp.inputs[0] if scriptOp.inputs else None
     levels = {}
     for band in BANDS:
         chan = source[band] if source is not None else None
-        levels[band] = chan[0] if chan is not None else 0.0
+        value = chan[0] if chan is not None else 0.0
+        levels[band] = value if math.isfinite(value) else 0.0
     return levels
 
 
@@ -168,6 +171,7 @@ def onCook(scriptOp):
         _drop_flag = 0
         scriptOp.addScriptError('audio_bands: {}'.format(e))
 
+    scriptOp.isTimeSlice = False
     scriptOp.clear()
     scriptOp.numSamples = 1
     for band in BANDS:

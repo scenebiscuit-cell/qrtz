@@ -98,7 +98,13 @@
     "prefer": "link",
     "link_lost_after_sec": 3,
     "audio_settle_sec": 10,
-    "bpm_multiplier": 1.0
+    "audio_lost_after_sec": 4,
+    "audio_bpm_window_beats": 16,
+    "audio_silence_level": 0.005,
+    "audio_silence_after_sec": 0.5,
+    "bpm_multiplier": 1.0,
+    "beats_per_bar": 4,
+    "tracker_single_model": true
   },
   "crystal": {
     "marker_hsv_min": [0.0, 0.5, 0.4],

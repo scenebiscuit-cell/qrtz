@@ -79,7 +79,7 @@ The software is free until you take paid gigs. Standalone mode needs no hardware
 | [TouchDesigner Commercial](https://derivative.ca/UserGuide/Licensing) | $600 one-time | Needed for paid gigs. One key, movable between computers. |
 | [Ableton Link CHOP](https://docs.derivative.ca/Ableton_Link_CHOP) | Built in | Tempo, bar ramp and beat pulses from any Link app on the network. |
 | [TDAbleton](https://docs.derivative.ca/TDAbleton) | Built in | Deeper Ableton Live control (clips, devices, tracks). Needs Live 11.1.5 or newer. |
-| [lastBeatStanding](https://derivative.ca/community-post/asset/last-beat-standing-rocksolid-ai-based-realtime-beat-detection/74246) | Free | Audio beat tracker. Fallback when the DJ isn't using Link. Needs TouchDesigner 2025.32280 or newer, which the current build covers. |
+| [lastBeatStanding](https://derivative.ca/community-post/asset/last-beat-standing-rocksolid-ai-based-realtime-beat-detection/74246) | Free for non-commercial use | Audio beat tracker. Fallback when the DJ isn't using Link. Needs TouchDesigner 2025.32280 or newer, which the current build covers. **Paid gigs need a decision:** its code is GPL v3, but its model weights are CC BY-NC-SA 4.0, so commercial use needs permission from the [madmom](https://github.com/CPJKU/madmom) authors. Before taking paid work, get that permission or replace the fallback. Kept out of Git (see `tox/vendor/README.md`) because this repo is public. |
 | [MediaPipe plugin](https://github.com/torinmb/mediapipe-touchdesigner) | Free, open source | Hand tracking for the DJ's gestures (crystal stage). One person at close range is what it does best. |
 | [Open Beat Control](https://github.com/Deep-Symmetry/open-beat-control) | Free, open source | Optional: reads beats from Pioneer CDJ networks and sends OSC, for booths with CDJs and no laptop. |
 
@@ -204,18 +204,33 @@ For the crystal stage, start with one camera framed on the crystal plus the spac
 
 ### Tempo sync per DJ app
 
-All five use Ableton Link, so TouchDesigner needs one Ableton Link CHOP for every setup. TouchDesigner only *listens* to the tempo and never sets it, so it can't fight the DJ.
+Ableton Link works the same in every app that supports it, so TouchDesigner needs one Ableton Link CHOP for every setup, with no per-app option or settings. TouchDesigner only *listens* to the tempo and never sets it, so it can't fight the DJ. Link has no listen-only mode, and an app that joins a session TouchDesigner is already in takes on TouchDesigner's tempo (tested: a peer joining at 128 was pulled to 120). So `tempo.tox` stays out of Link and hears peers announce themselves on the network, joining only once one appears and leaving when the last one goes. Rekordbox held its tempo when tested on M2. **Open issue:** one join by a stand-in test peer was still pulled from 128 to 120, cause not yet known, though other joins held. Set the tempo again if a DJ app jumps when Link connects, and re-test this before relying on Link at a gig.
+
+`tempo_out` has `beat` (a one-frame pulse), `bpm`, `bar_phase` (0 to 1 across the bar) and `source` (2 = link, 1 = audio, 0 = clock; the `source_name` DAT shows it as a word). If neither Link nor audio is usable, an internal clock carries on at the last BPM, so the output never stops. Audio has to produce beats for `audio_settle_sec` before it's trusted, and its BPM is measured from the last 16 beat gaps because the tracker's own number jumps around. The tracker counts beats but can't hear the downbeat, so **with audio as the source, `bar_phase` is a count from wherever it started, not the true bar**. Only Link gives the real bar.
 
 | App | Link support | What to know |
 | --- | --- | --- |
-| [Rekordbox](https://rekordbox.com/en/support/faq/ableton-link/) | LINK button in the global section | Check its FAQ for limits when a DJ controller is plugged in. |
+| [Rekordbox](https://rekordbox.com/en/support/faq/ableton-link/) | LINK button at the top of the screen in PERFORMANCE mode | Tested on M2. With a DJ controller plugged in, its tempo slider can't change the Link BPM; use the Link subscreen (right-click LINK). |
 | [Serato DJ Pro](https://serato.com/dj/pro/expansions/more/abletonlink) | Since Serato DJ 1.9.3 | A Link toggle sits where each deck's Sync button would be. |
 | Traktor Pro | Since [Traktor Pro 2.11](https://synthtopia.com/?p=75959) | Users report decks can't become the Link tempo leader. Fine here, since TouchDesigner only listens. |
 | Engine DJ | Since [Engine DJ 2.0](https://djmag.com/news/denon-dj-introduces-engine-dj-20), on standalone hardware too | Works with Denon gear without a laptop. |
+| [VirtualDJ](https://www.ableton.com/en/link/products/) | Yes | A [Bonedo guide](https://www.bonedo.de/artikel/virtualdj-basics-ableton-link-installieren-und-aktivieren/) says it's added once through the effects list, not on by default. |
+| [djay Pro](https://help.algoriddim.com/user-manual/djay-pro-windows/dj-tools/performance-tools/ableton-link) | Yes, from the main menu | Mac, Windows and iOS. |
+| Mixxx | No native support found | Uses the audio tracker. |
 | Ableton Live | Built in | Add TDAbleton for clip and knob control beyond tempo. |
+| Logic Pro | [Listed by Ableton](https://www.ableton.com/en/link/products/); Mac since 10.7.5 per a news report | [iPad steps](https://support.apple.com/guide/logicpro-ipad/lpip7da90b7c/ipados) are documented; the Mac menu path isn't confirmed. |
+| [Pro Tools](https://cdm.link/all-versions-of-pro-tools-now-support-ableton-link/) | Since 2020.9, all editions | Has a Link button. |
+| [Bitwig Studio](https://musicradar.com/news/bitwig-studio-gets-ableton-link-now-you-can-sync-it-with-live-and-other-apps) | Since 2.2 | |
+| [Reason](https://www.ableton.com/en/link/products/) | Yes | |
+| Cubase | Unclear | Ableton's list includes it, but [Steinberg forum users](https://forums.steinberg.net/t/ableton-link-sync-with-cubase/132247) report no Link. Test before relying on it. |
+| Studio One | Unclear | One [user report](https://community.native-instruments.com/discussion/comment/233054) of Link in 7.2.1, another source says no. Test before relying on it. |
+| Reaper | Third-party only | Through the [ReaBlink extension](https://www.kvraudio.com/forum/viewtopic.php?p=8918837), per forum reports. |
+| FL Studio | No native support found | [Users were still asking in 2026](https://forum.image-line.com/viewtopic.php?p=1863571). Uses the audio tracker. |
 | Pioneer CDJs, no laptop | Not Link | Use Open Beat Control to send beats as OSC. It can't share a computer with rekordbox. |
 
-Link only helps when the DJ turns it on. If they don't, the audio beat tracker takes over automatically.
+This table comes from published sources, some of them forum posts. Rekordbox is the only one tested with QRTZ so far (on M2).
+
+Link only helps when the DJ turns it on. If they don't, or the app has no Link, the audio beat tracker takes over automatically.
 
 ### Later: the optional crowd layer
 
@@ -326,6 +341,7 @@ The rule: keep everything an AI might edit in plain text files outside the `.toe
 qrtz/
 ├─ QRTZ.toe                  # main project (binary; commit, but don't expect diffs)
 ├─ tox/                      # one external .tox per module
+│  ├─ vendor/                # third-party components, downloaded, not in Git (see its README)
 │  ├─ audio.tox              # line in → bass, mids, treble, drops (audio_out)
 │  ├─ tempo.tox              # Ableton Link + audio fallback (tempo_out)
 │  ├─ virtual_crystal.tox    # 3D gem that refracts the art → crystal_out
@@ -340,6 +356,7 @@ qrtz/
 ├─ scripts/                  # Python, synced into Text DATs
 │  ├─ brain_ext.py           # scene choice, smoothing, overrides, live crystal
 │  ├─ audio_bands.py         # band smoothing and drop detection
+│  ├─ tempo_source.py        # chooses Link, audio or clock; joins Link only after hearing a peer
 │  ├─ crystal_track.py       # marker angle and spin speed
 │  ├─ gestures.py            # pinch, palm, hand height, hold timers
 │  ├─ led_serial.py          # sends colors to the board
@@ -378,7 +395,7 @@ Sixteen small steps in three stages, each testable on its own. Commit to Git aft
 
 - [x] **M0 — Setup.** Install TouchDesigner 2025.33230 or newer (Non-Commercial key), VS Code, Node.js and the Arduino IDE. Clone this repo to `C:\Projects\qrtz`. Add the TouchDesigner MCP server to Claude Code. *Check:* ask Claude Code for the TouchDesigner build number; it answers from the running project.
 - [x] **M1 — Audio.** Audio Device In from loopback or a line in; `audio.tox` splits it into bass, mids and treble, smooths each band, and flags drops, into `audio_out`. Band edges and smoothing come from `settings.json`. *Check:* play a track with a clear kick; bass jumps on every kick, treble follows the hats, and a drop raises the drop flag once, not on every beat.
-- [ ] **M2 — Tempo.** Ableton Link CHOP plus lastBeatStanding as fallback, merged into `tempo_out` (beat, BPM, bar phase, source). Test with Ableton Live or any DJ app on the same machine. *Check:* set the app to 128 BPM; TouchDesigner reads 128 and `source` says link. Turn Link off; it switches to audio within 10 seconds.
+- [x] **M2 — Tempo.** Ableton Link CHOP plus lastBeatStanding as fallback, fed from `audio_raw_out` in `audio.tox` and merged into `tempo_out` (beat, BPM, bar phase, source). Test with Ableton Live or any DJ app on the same machine. *Check:* with music playing, set the app to 128 BPM and turn on Link; the app stays at 128, TouchDesigner reads 128 and `source` says link. Turn Link off; it switches to audio within 10 seconds.
 - [ ] **M3 — Virtual crystal.** `virtual_crystal.tox`: a faceted gem rendered over a test image, with `crystal_refract.glsl` bending the image through the facets and splitting edges into color. It turns once every 8 bars, breathes on bass and sparkles on treble, and writes `crystal_out` plus angle, spin speed and sparkle. *Check:* with music playing, the gem turns in time, the facets push on the kick, and the edges glint on the hats; the output holds 60 FPS.
 - [ ] **M4 — First scene.** One GLSL scene that uses `crystal_out` as its lens, pulses on the beat and changes scene only on the bar. *Check:* with music playing, pulses land on the kick and the crystal's sparkle is visible in the result.
 - [ ] **M5 — Palettes and BPM bands.** Palettes in `settings.json`; the brain picks a scene by BPM band and cross-fades over 2 bars. *Check:* move from 90 to 128 BPM; the scene changes within 4 bars with no hard cut.
@@ -404,7 +421,7 @@ Sixteen small steps in three stages, each testable on its own. Commit to Git aft
 Paste into Claude Code with the TouchDesigner MCP connected, one milestone per chat. Its rules live in `CLAUDE.md`.
 
 1. *M1:* "Read PLAN.md. Build M1 in /project1/audio: an Audio Device In CHOP from my loopback device, split into bass, mids and treble with band edges from config/settings.json, smoothed, plus a drop flag, all into a Null CHOP named audio_out. Explain each new operator, then tell me how to check it worked."
-2. *M2:* "Build M2 in /project1/tempo: an Ableton Link CHOP plus lastBeatStanding on Audio Device In. Output beat, bpm, bar_phase and source to tempo_out, preferring Link and switching to audio when Link has no peers."
+2. *M2:* "Build M2 in /project1/tempo: an Ableton Link CHOP plus lastBeatStanding on the raw audio from audio_raw_out in /project1/audio. Output beat, bpm, bar_phase and source to tempo_out, preferring Link and switching to audio when Link has no peers."
 3. *M3:* "Build M3 in /project1/virtual_crystal: a faceted gem rendered over a test image, with shaders/crystal_refract.glsl doing refraction and dispersion through the facets. Drive rotation from tempo_out (one turn per 8 bars), facet depth from bass and sparkle from treble in audio_out. Output a Null TOP named crystal_out and a Null CHOP with angle, spin_speed and sparkle."
 4. *M10:* "Build M10 in /project1/crystal_cam: Video Device In from my webcam, cropped to the crystal, into crystal_out, with the brain switching between it and the virtual crystal by image_source in settings.json. Tell me where to switch off autofocus and auto-exposure, and how to check it worked."
 5. *M11:* "Write scripts/crystal_track.py: find the colored marker in crystal_out, output angle in degrees and spin_speed, smoothed. Colors and thresholds come from config/settings.json."
@@ -429,7 +446,9 @@ Write the remaining prompts the same way: point at PLAN.md, name the milestone, 
 - DJs who beatmatch by ear may never turn on Link. The audio fallback has to be solid.
 - A loud room or a mic picks up crowd noise; a line in from the mixer gives cleaner bass and treble readings than a microphone.
 - Some audio drivers block the Ableton Link CHOP on Windows; Derivative's docs suggest the free ASIO4All driver as a fix.
+- The audio beat tracker runs in Python on TouchDesigner's main thread. In M2 testing it held 60 FPS with one model (`tracker_single_model`, the default here), but only with the rest of the project still small. Re-check the frame rate once scenes exist, and try the slower 8-model ensemble only if there's headroom.
 - TouchDesigner stopped cooking when its window was minimized in testing, and audio operators don't run while the timeline is paused. Never minimize it during a show, and check the timeline is playing. M14's show mode should guard against both.
+- In M2 testing, a second Audio Device In on Stereo Mix read pure silence while the first one worked, with no error shown. So only `audio.tox` opens the audio device, and anything else that needs the raw signal reads `audio_raw_out`.
 - The virtual crystal is a 3D render plus a refraction shader every frame. Keep the gem low-poly and watch the frame rate on the RX 9070 and the 3060 Ti.
 - Booth lights and strobes change what the camera sees. The dome, backdrop and locked exposure keep most of it out; test under real club lighting early.
 - A K9 glass crystal can chip or crack if knocked. Carry a spare, or use acrylic for gigs.
