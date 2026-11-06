@@ -49,7 +49,7 @@ A 70 BPM track and a 140 BPM track can feel the same (half-time), so keep a "×2
 
 ## Standalone mode: the virtual crystal
 
-The virtual crystal is a faceted 3D gem rendered inside TouchDesigner. It sits between the viewer and the art (photos, paintings or a shader scene) and bends the image through its facets, the way a real crystal held up to a picture would. It writes its result to the same Null TOP, `crystal_out`, that the crystal camera uses later, and it outputs the same numbers (angle, spin speed, sparkle). So the scenes, light modes and brain never need to know which crystal is live.
+The virtual crystal is a faceted 3D gem rendered inside TouchDesigner, ray-traced in one GLSL shader rather than built from geometry and a camera, so it takes few operators (about 1.4 ms of GPU per frame in M3 testing). It sits between the viewer and the art (photos, paintings or a shader scene) and bends the image through its facets, the way a real crystal held up to a picture would. It writes its result to the same Null TOP, `crystal_out`, that the crystal camera uses later, and it outputs the same numbers (angle, spin speed, sparkle). So the scenes, light modes and brain never need to know which crystal is live.
 
 **What the music drives:**
 
@@ -63,7 +63,7 @@ The virtual crystal is a faceted 3D gem rendered inside TouchDesigner. It sits b
 
 **How sound gets in:** an Audio Device In CHOP listens to a line in from the DJ mixer's booth or record output through a USB audio interface. For testing at home, play music on the PC and capture it with the sound card's loopback (on many Windows PCs it's called "Stereo Mix"). `audio.tox` splits the sound into bass, mids and treble with audio filters, measures each band's level, smooths it so it doesn't flicker, and flags a drop when energy jumps well above its recent average. The band edges, band gains and smoothing live in `config/settings.json`, along with the input: `audio.device` is matched against part of the device name ("Stereo Mix" at home, your USB interface at a gig), and an unmatched name falls back to the system default input.
 
-**How a drop is detected:** the average energy of the last 2 seconds has to reach 1.8 times the average of the 4 seconds before that. The short window spans more than one beat, so ordinary kicks don't trigger it at any tempo (simulated from 50 to 200 BPM), at the cost of the flag rising about half a second after the drop lands. Music must have been playing for the whole 6 seconds, so a track starting from silence doesn't count, while a short pause right before a drop still does. After a flag, the detector rests for `drop_cooldown_bars` (8 bars, using `tempo_out` BPM from M2 on and `fallback_bpm` until then).
+**How a drop is detected:** either of two things raises the flag. *Bass return:* the bass stays below 35% of its recent peak for at least 4 seconds, then returns to 70% of it. Kicks keep resetting that timer, so normal playing never arms it. *Bass jump:* the bass hits at least twice its recent peak, and at least 0.3 on the level meter, which is how a track's first drop looks with nothing earlier to return to. Nothing fires in a track's first 30 seconds, and 3 seconds of near-silence counts as a new track, while a short pause right before a real drop doesn't. The trade-offs: a track whose first drop comes within 30 seconds is missed, and so is any drop where the bass neither returns from a long gap nor jumps, such as a track that's bass-heavy all the way through. A second rule that watched the whole mix stepping up was tried and removed: it caught one unusual track's main drop, but on the typical tracks it only fired false alarms, one of which blocked a real drop. For what the rule can't hear, such as a track that's bass-heavy from start to finish, the DJ can call a drop with the `J` key (`drop_manual_key`, and MIDI note 41 once M9 is built). A press raises the same flag and skips the rule and its cooldown, and it's ignored if it comes within half a second of the last drop. After a flag, the detector rests for `drop_cooldown_bars` (8 bars, using `tempo_out` BPM from M2 on and `fallback_bpm` until then).
 
 **Which crystal is live:** `image_source` in `settings.json` is `auto` by default: the crystal camera when one is connected and showing a crystal, the virtual crystal otherwise. MIDI note 40 or the operator screen can force either one.
 
@@ -193,7 +193,7 @@ In standalone mode the music itself is the main controller, and the DJ or operat
 | The music: bass, mids, treble, drops | `audio.tox` on the line in | See "What the music drives" above |
 | Link tempo and bar | Ableton Link CHOP | Beat pulses, scene changes on the bar, BPM band |
 | Ableton clips and knobs | TDAbleton | Launching a clip can switch scenes; a Live macro knob can drive any parameter |
-| Knobs and pads | Optional MIDI controller | Scene select, intensity, LED brightness, blackout, light mode (note 39), which crystal is live (note 40) |
+| Knobs and pads | Optional MIDI controller | Scene select, intensity, LED brightness, blackout, light mode (note 39), which crystal is live (note 40), call a drop (note 41) |
 | Phone page | Web Server DAT | Backup controls and photo upload for you (behind the PIN); palette votes for the crowd |
 | Spin the base (crystal stage) | Camera tracks a small colored dot on the base | Rotation angle turns the visuals; spin speed sets motion intensity |
 | Hand height over the dome (crystal stage) | MediaPipe hand tracking | Higher hand = more bloom and density |
@@ -357,12 +357,21 @@ qrtz/
 │  ├─ brain_ext.py           # scene choice, smoothing, overrides, live crystal
 │  ├─ audio_bands.py         # band smoothing and drop detection
 │  ├─ tempo_source.py        # chooses Link, audio or clock; joins Link only after hearing a peer
+│  ├─ crystal_motion.py      # virtual crystal: tempo and audio to angle, spin speed, sparkle
 │  ├─ crystal_track.py       # marker angle and spin speed
 │  ├─ gestures.py            # pinch, palm, hand height, hold timers
 │  ├─ led_serial.py          # sends colors to the board
 │  └─ web_callbacks.py       # Web Server DAT handlers
 ├─ shaders/                  # GLSL shaders
-│  ├─ crystal_refract.glsl   # virtual crystal: refraction and dispersion through facets
+│  ├─ crystal_gem.glsl       # virtual crystal: shared ray-traced gem, refraction and dispersion through facets
+│  ├─ crystal_refract.glsl   # virtual crystal: draws the main gem
+│  ├─ crystal_small.glsl     # virtual crystal: draws the small gem into its own small image
+│  ├─ crystal_figure.glsl    # virtual crystal: draws the small figures (melting smiley, dolphin tablet)
+│  ├─ dolphin_field.glsl     # virtual crystal: works out the dolphin's distances once, for the pill
+│  ├─ crystal_blobs.glsl     # virtual crystal: small lava-lamp blobs that morph out and drift away
+│  ├─ crystal_layers.glsl    # virtual crystal: puts the main gem and small one together by depth
+│  ├─ crystal_shatter.glsl   # virtual crystal: shards on a drop, gem over the dimmed image
+│  ├─ test_pattern.glsl      # grid test image until the photo deck arrives in M5
 │  ├─ scene_organic.glsl
 │  ├─ scene_flow.glsl
 │  ├─ scene_grid.glsl
@@ -385,18 +394,19 @@ The phone page and the Arduino sketch are small, self-contained files, which mak
 
 ## Build milestones
 
-Sixteen small steps in three stages, each testable on its own. Commit to Git after every one that works.
+Seventeen small steps in four stages, each testable on its own. Commit to Git after every one that works.
 
 - **Stage A, standalone visualizer (M0–M9):** no hardware needed. At the end you have a working music visualizer with your photos and a virtual crystal.
 - **Stage B, add the crystal (M10–M13):** the desk prototype, camera, spin tracking, LED ring and gestures.
 - **Stage C, show-ready (M14–M15):** show mode, fallbacks and a booth test.
+- **Stage D, share it (M16):** a demo people can try without installing anything, to help get gigs and test interest in selling QRTZ.
 
 **Stage A: standalone visualizer**
 
 - [x] **M0 — Setup.** Install TouchDesigner 2025.33230 or newer (Non-Commercial key), VS Code, Node.js and the Arduino IDE. Clone this repo to `C:\Projects\qrtz`. Add the TouchDesigner MCP server to Claude Code. *Check:* ask Claude Code for the TouchDesigner build number; it answers from the running project.
 - [x] **M1 — Audio.** Audio Device In from loopback or a line in; `audio.tox` splits it into bass, mids and treble, smooths each band, and flags drops, into `audio_out`. Band edges and smoothing come from `settings.json`. *Check:* play a track with a clear kick; bass jumps on every kick, treble follows the hats, and a drop raises the drop flag once, not on every beat.
 - [x] **M2 — Tempo.** Ableton Link CHOP plus lastBeatStanding as fallback, fed from `audio_raw_out` in `audio.tox` and merged into `tempo_out` (beat, BPM, bar phase, source). Test with Ableton Live or any DJ app on the same machine. *Check:* with music playing, set the app to 128 BPM and turn on Link; the app stays at 128, TouchDesigner reads 128 and `source` says link. Turn Link off; it switches to audio within 10 seconds.
-- [ ] **M3 — Virtual crystal.** `virtual_crystal.tox`: a faceted gem rendered over a test image, with `crystal_refract.glsl` bending the image through the facets and splitting edges into color. It turns once every 8 bars, breathes on bass and sparkles on treble, and writes `crystal_out` plus angle, spin speed and sparkle. *Check:* with music playing, the gem turns in time, the facets push on the kick, and the edges glint on the hats; the output holds 60 FPS.
+- [x] **M3 — Virtual crystal.** `virtual_crystal.tox`: a faceted gem rendered over a test image, with `crystal_refract.glsl` bending the image through the facets and splitting edges into color. It turns once every 8 bars, sways, breathes on bass, kicks on the beat, sparkles on treble, explodes into shards that reform on a drop, and changes crystal shape every 90 seconds, taking turns between morphing in place and shrinking away to return as the next shape. Every few bars, the gem glides to a new way of moving: a different spin speed, sometimes reversed, with a different sway and lean. With no music it just turns steadily. Every so often a blob buds off, becomes a small crystal, orbits the main gem in 3D, passing in front and behind, then returns to be absorbed. It makes many passes on a smooth, tempo-following orbit that glides to a new plane every few bars and sometimes reverses, never lingers over the main gem, moves like the main gem with its own timing and a little more of each motion, and on each beat swells softly and melts part of the way back to a blob. Every few seconds a small lava-lamp blob morphs out of the main gem or the small object, wobbles and drifts out of the picture, in the color of whatever it came from. Without music it still spins and refracts but doesn't pulse: the pulse follows the loudest band compared with the song's recent peak, so a sound at the front of the mix drives it, with or without bass, and quiet sounds behind the mix don't. It writes `crystal_out` plus angle, spin speed and sparkle. *Check:* with music playing, the gem turns in time, the facets push on the kick, the edges glint on the hats, and a drop blows it apart and brings it back; stop the music and the pulsing stops; every 90 seconds the shape changes smoothly; the output holds 60 FPS.
 - [ ] **M4 — First scene.** One GLSL scene that uses `crystal_out` as its lens, pulses on the beat and changes scene only on the bar. *Check:* with music playing, pulses land on the kick and the crystal's sparkle is visible in the result.
 - [ ] **M5 — Palettes and BPM bands.** Palettes in `settings.json`; the brain picks a scene by BPM band and cross-fades over 2 bars. *Check:* move from 90 to 128 BPM; the scene changes within 4 bars with no hard cut.
 - [ ] **M6 — Photo deck.** Folder DAT on `images/`, double-buffered loading, Fit TOP, refraction through the crystal, liquid ripple on bass, dispersion on treble, palette recolor toggle, next image on the bar. *Check:* drop a new JPG into the folder mid-run; it joins the deck within a few seconds, the music visibly moves it, and switching images never drops below 60 FPS.
@@ -415,6 +425,16 @@ Sixteen small steps in three stages, each testable on its own. Commit to Git aft
 
 - [ ] **M14 — Show mode.** Fullscreen output, the flash limiter (see Risks), and fallbacks: no camera → crystal loops, then the virtual crystal; no Link → audio beat tracking; no audio → internal clock at the last BPM. *Check:* unplug the camera, the LED board and the audio mid-set; visuals keep running and each recovers when replugged. Hold 60 FPS.
 - [ ] **M15 — Booth test and demo reel.** Build the final mount plate and dome, then run a 2-hour set with a DJ friend. *Check:* no crash, no accidental gestures; 60 seconds of footage showing the DJ's hand, the crystal and the screen together.
+
+**Trying now: figures for the small crystal.** Besides a crystal, the small crystal can come out as a shape with dents and gaps, which the flat-facet method can't draw. These are built in the shader from distance math, and cut like crystal, with flat edges, rings of facets, refraction and rainbow edges, so they melt out of the glass sphere and stay part of the same world as the gems. They only appear with the virtual crystal, because the real camera crystal can't change shape. `satellite_figures` lists which ones take turns: a yellow crystal melting smiley, a teal crystal tablet with a smooth top and a dolphin recessed into it, and the plain crystal. The small object draws in its own small image, which keeps the frame rate up. This isn't a milestone yet: it depends on how they look. The smiley is drawn from scratch. The dolphin's outline is traced from an image the owner supplied, so check that image's license before selling QRTZ or using it publicly.
+
+**Stage D: share it**
+
+- [ ] **M16 — Shareable demo.** A demo video, plus a page that runs in a web browser, so a potential client can play with QRTZ without installing anything. It's a separate small build, not the TouchDesigner project: the crystal shaders are ported to WebGL (graphics that run in the browser), and the drop and crystal motion logic to JavaScript, with sound analyzed in the browser. Visitors get a bundled demo track or their own audio file, a drop button, and shape and palette controls. Decide before starting: whether the demo video and page count as commercial use under the Non-Commercial license (ask Derivative), and that the demo track is cleared for use. *Check:* on a computer that has never had TouchDesigner, open the link, press play, and see the crystal react and explode on the track's drop within a few seconds of the page loading.
+
+**Later option: drops from Rekordbox's cues.** Rekordbox's automatic hot cue C landed on the drop in the 5 songs the owner has tested so far. To fire on it, QRTZ needs the cue times, plus the current track and position, which Rekordbox doesn't offer officially. [rkbx_link](https://github.com/grufkork/rkbx_link) reads them from Rekordbox's memory, needs a paid license for current versions, and only supports listed Rekordbox versions, so an update could break it. This would be an extra layer for Rekordbox only, with the automatic rule and the `J` key as the fallback. Before building: test more songs, and confirm where the automatic cues are stored and that a tool can read them.
+
+**Later decision: selling QRTZ.** Only if the demo draws interest. Buyers could run the project with TouchPlayer, which needs a license for each paid use and doesn't make a double-click app, or QRTZ could be rebuilt as its own app. Derivative's pages don't cover reselling a project, so ask them first. The beat tracker's weights also need commercial permission or a replacement.
 
 ## Prompts, one per milestone
 

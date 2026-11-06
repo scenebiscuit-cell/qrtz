@@ -1,15 +1,14 @@
 """Band smoothing and drop detection for audio.tox.
 
 Synced into the Text DAT /project1/audio/audio_bands. The Script CHOP "bands"
-calls onCook once a frame with one RMS level per band, and writes the bass,
-mids, treble and drop channels that end up in audio_out.
+calls onCook once a frame with one RMS level per band and the manual drop key,
+and writes the bass, mids, treble and drop channels that end up in audio_out.
 
 All tunable numbers come from the "audio" section of config/settings.json.
 """
 
 import json
 import math
-from collections import deque
 
 BANDS = ('bass', 'mids', 'treble')
 BEATS_PER_BAR = 4
@@ -23,62 +22,97 @@ def smooth_step(current, target, dt, attack_sec, release_sec):
     return current + (target - current) * (1 - math.exp(-dt / time_constant))
 
 
-def _average(values):
-    values = list(values)
-    return sum(values) / len(values) if values else 0.0
-
-
 class DropDetector:
-    """Flags a sudden, sustained jump in energy.
+    """Flags big and medium drops, which show up in two ways.
 
-    Compares the average of the last short window against the average of the
-    window before it. The short window is longer than one beat, so a single
-    kick can't lift it far above the recent average, while a real drop lifts
-    it and keeps it there.
+    Bass return: the bass goes away for several seconds, then comes back close to
+    its earlier strength. Kicks keep resetting the timer, so normal playing never
+    arms it.
+
+    Bass jump: the bass suddenly hits far harder than anything recent, which is how
+    a track's first drop looks, with nothing earlier to return to.
+
+    Neither counts in the first part of a track, where an intro's kick coming in
+    would otherwise look just like a drop.
     """
 
     def __init__(self):
-        self.samples = deque()
+        self.reference = 0.0
+        self.jump_base = 0.0
+        self.last_time = None
         self.last_loud = -math.inf
         self.music_since = math.inf
+        self.quiet_since = None
+        self.armed = False
         self.cooldown_until = -math.inf
         self.flag_until = -math.inf
+        self.last_fired = -math.inf
 
-    def update(self, now, energy, cfg, bpm):
-        """Add one energy reading and return 1 while the flag is up, else 0."""
-        short_sec = cfg['drop_short_window_sec']
+    def update(self, now, bass, rms, cfg, bpm):
+        """Add one reading, where bass is the smoothed level and rms holds each
+        band's raw level. Returns 1 while the flag is up, else 0."""
+        dt = 0.0 if self.last_time is None else max(now - self.last_time, 0.0)
+        self.last_time = now
 
-        # After a stall the stored readings no longer describe "just before
-        # now", so start the comparison again.
-        if self.samples and now - self.samples[-1][0] > short_sec:
-            self.samples.clear()
-        self.samples.append((now, energy))
-
-        horizon = now - short_sec - cfg['drop_window_sec']
-        while len(self.samples) > 1 and self.samples[1][0] <= horizon:
-            self.samples.popleft()
-
-        # Music has to have been playing across the whole comparison, which
-        # rules out room noise and tracks starting from silence. Silence longer
-        # than the earlier window restarts the clock, so the short pause right
-        # before a real drop doesn't.
-        if energy >= cfg['drop_min_level']:
-            if now - self.last_loud > cfg['drop_window_sec']:
+        # Silence means a new track, with nothing yet to compare against. A
+        # short pause right before a real drop isn't long enough to count.
+        if sum(rms.values()) >= cfg['drop_min_level']:
+            if now - self.last_loud > cfg['drop_silence_reset_sec']:
                 self.music_since = now
+                self.reference = 0.0
+                self.jump_base = 0.0
+                self.quiet_since = None
+                self.armed = False
             self.last_loud = now
 
-        warmed_up = (self.samples[0][0] <= horizon
-                     and self.music_since <= horizon)
-        if warmed_up and now >= self.cooldown_until:
-            split = now - short_sec
-            recent_avg = _average(e for t, e in self.samples if t > split)
-            earlier_avg = _average(e for t, e in self.samples if t <= split)
-            if recent_avg >= cfg['drop_threshold'] * earlier_avg:
-                bar_sec = BEATS_PER_BAR * 60.0 / bpm
-                self.cooldown_until = now + cfg['drop_cooldown_bars'] * bar_sec
-                self.flag_until = now + cfg['drop_flag_hold_sec']
+        # The recent peak falls slowly, and never below a minimum, so faint
+        # sound can't pass for a strong bass.
+        decay = 0.5 ** (dt / cfg['drop_reference_halflife_sec'])
+        self.reference = max(self.reference * decay, cfg['drop_min_bass'])
 
+        if bass < cfg['drop_breakdown_ratio'] * self.reference:
+            if self.quiet_since is None:
+                self.quiet_since = now
+            if now - self.quiet_since >= cfg['drop_breakdown_sec']:
+                self.armed = True
+        else:
+            self.quiet_since = None
+
+        # The bass coming back uses up the breakdown even if it's too early to
+        # count, or the next kick in an ordinary intro would raise the flag.
+        returned = self.armed and bass >= cfg['drop_return_ratio'] * self.reference
+        if returned:
+            self.armed = False
+
+        # Compared with the peak from about a second ago, because the bass takes a
+        # few frames to rise and the current peak rises right along with it.
+        self.jump_base += ((self.reference - self.jump_base)
+                           * (1.0 - math.exp(-dt / cfg['drop_jump_lag_sec'])))
+        jumped = (bass >= cfg['drop_jump_min_level']
+                  and bass >= cfg['drop_jump_ratio'] * max(self.jump_base, cfg['drop_min_bass']))
+
+        if ((returned or jumped)
+                and now - self.music_since >= cfg['drop_min_music_sec']
+                and now >= self.cooldown_until):
+            self._fire(now, cfg, bpm)
+
+        self.reference = max(self.reference, bass)
         return 1 if now < self.flag_until else 0
+
+    def _fire(self, now, cfg, bpm):
+        """Raise the flag, then rest so the same drop can't fire twice."""
+        bar_sec = BEATS_PER_BAR * 60.0 / bpm
+        self.cooldown_until = now + cfg['drop_cooldown_bars'] * bar_sec
+        self.flag_until = now + cfg['drop_flag_hold_sec']
+        self.last_fired = now
+
+    def press(self, now, cfg, bpm):
+        """The DJ called a drop. It skips the automatic rules and cooldown, and
+        uses up any breakdown so the bass returning doesn't fire a second one.
+        Presses too close together are ignored, to respect the flash limit."""
+        if now - self.last_fired >= cfg['drop_manual_min_gap_sec']:
+            self.armed = False
+            self._fire(now, cfg, bpm)
 
 
 # ---- TouchDesigner side -----------------------------------------------------
@@ -87,6 +121,7 @@ _settings_text = None
 _settings = None
 _levels = {band: 0.0 for band in BANDS}
 _drop_flag = 0
+_key_was_down = False
 _last_cook_sec = None
 _detector = DropDetector()
 
@@ -149,6 +184,16 @@ def _read_rms(scriptOp):
     return levels
 
 
+def _key_pressed(scriptOp):
+    """True on the one frame the drop key goes down. Holding it does nothing more."""
+    global _key_was_down
+    key = scriptOp.inputs[1] if len(scriptOp.inputs) > 1 else None
+    down = key is not None and key.numChans > 0 and key[0][0] > 0.5
+    pressed = down and not _key_was_down
+    _key_was_down = down
+    return pressed
+
+
 def onCook(scriptOp):
     """Update the bands and the drop flag, then write the output channels."""
     global _last_cook_sec, _drop_flag
@@ -164,8 +209,10 @@ def onCook(scriptOp):
             target = min(rms[band] * cfg['band_gain'][band], 1.0)
             _levels[band] = smooth_step(_levels[band], target, dt,
                                         cfg['attack_sec'], cfg['release_sec'])
-        _drop_flag = _detector.update(now, sum(rms.values()), cfg,
-                                      _current_bpm(cfg))
+        bpm = _current_bpm(cfg)
+        if _key_pressed(scriptOp):
+            _detector.press(now, cfg, bpm)
+        _drop_flag = _detector.update(now, _levels['bass'], rms, cfg, bpm)
     except Exception as e:
         # Show the problem on the node, and keep outputting the last values.
         _drop_flag = 0
