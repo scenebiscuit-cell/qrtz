@@ -20,6 +20,35 @@
     "crossfade_bars": 2,
     "change_only_on_bar": true
   },
+  "scene_grid": {
+    "looks": [
+      { "shape": "square", "cells": 3, "wedges": 0 },
+      { "shape": "hexagon", "cells": 2, "wedges": 6 },
+      { "shape": "triangle", "cells": 1.6, "wedges": 3 },
+      { "shape": "diamond", "cells": 2.5, "wedges": 4 },
+      { "shape": "radial", "cells": 1, "wedges": 8 },
+      { "shape": "square", "cells": 2, "wedges": 0 },
+      { "shape": "hexagon", "cells": 3, "wedges": 6 },
+      { "shape": "radial", "cells": 1, "wedges": 12 }
+    ],
+    "bars_per_look": 4,
+    "beats_per_view": 8,
+    "turn_gain": 0.35,
+    "view_turn": 1,
+    "beat_release_sec": 0.2,
+    "pulse_attack_sec": 0.15,
+    "pulse_release_sec": 1.5,
+    "pulse_peak_halflife_sec": 60,
+    "pulse_floor_level": 0.25,
+    "pulse_from": 0.35,
+    "pulse_full_at": 0.7,
+    "beat_zoom": 0.025,
+    "beat_glow": 0.35,
+    "sparkle_glow": 2.5,
+    "facet_view": 0.75,
+    "facet_wander": 0.3,
+    "line_width": 0.02
+  },
   "safety": {
     "max_flashes_per_second": 3
   },
@@ -97,7 +126,7 @@
   },
   "virtual_crystal": {
     "turn_bars": 8,
-    "gem_size": 0.85,
+    "gem_size": 0.6,
     "gem_tilt_deg": 28,
     "ior": 1.55,
     "refraction": 0.45,
@@ -174,6 +203,8 @@
     "satellite_middle_min_spin": 0.5,
     "satellite_bob": 0.06,
     "satellite_bob_sec": 3,
+    "droplet_shape": "heart",
+    "droplet_heart_morph_sec": 1.2,
     "droplet_gem_interval_sec": 7.5,
     "droplet_smiley_interval_sec": 3.5,
     "droplet_pill_interval_sec": 6,
@@ -194,10 +225,20 @@
     "droplet_idle_flow": 0.35,
     "droplet_max_sec": 25,
     "explode_out_beats": 0.5,
-    "explode_reform_beats": 4,
-    "shard_spread": 1.3,
+    "explode_hold_beats": 16,
+    "explode_reform_beats": 6,
+    "explode_every_bars": 16,
+    "explode_min_intensity": 0.6,
+    "shard_gem_size": 0.85,
+    "shard_spread": 1.1,
     "shard_size": 0.11,
-    "shard_spin": 1.2
+    "shard_grow": 1.5,
+    "shard_spin": 1.2,
+    "shard_turns_per_bar": 0.205,
+    "shard_spin_max": 6,
+    "shard_pulse_release_sec": 0.25,
+    "shard_pulse_size": 0.15,
+    "shard_pulse_glow": 0.5
   },
   "tempo": {
     "prefer": "link",
