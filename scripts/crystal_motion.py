@@ -20,6 +20,9 @@ SHAPE_NUMBERS = {'brilliant': 0, 'quartz': 1, 'octahedron': 2, 'emerald': 3}
 FIGURE_NUMBERS = {'crystal': 0, 'laughing_face': 1, 'pill': 2}
 # Where the smiley's drips end, in its own space. Same places as crystal_figure.glsl.
 SMILEY_DRIP_TIPS = ((-0.34, -0.62), (-0.09, -0.52), (0.13, -0.86), (0.38, -0.56))
+# A blob's last number holds its kind, plus how far it has formed into a heart times this.
+# crystal_blobs.glsl divides by the same number.
+HEART_FRACTION = 0.99
 # A gem can't be drawn at size zero, so "gone" is this small.
 MIN_SCALE = 0.001
 
@@ -230,11 +233,107 @@ class Droplets:
             # Slightly long as it comes out, then a slow wobble between tall and wide.
             ripple = age * cfg['droplet_ripple_rate'] + ball['phase']
             stretch = 1.0 + cfg['droplet_emerge_stretch'] * (1.0 - progress) + 0.16 * math.sin(ripple)
+            # Comes out round, then forms into a heart once it's clear of its source.
+            heart = 0.0
+            if cfg['droplet_shape'] == 'heart':
+                heart = _ease(min(ball['free_for'] / cfg['droplet_heart_morph_sec'], 1.0))
             rows.append((screen_x, screen_y, radius,
                          math.sqrt(ball['x'] ** 2 + ball['y'] ** 2 + depth ** 2),
-                         math.atan2(ball['vy'], ball['vx']), stretch, ripple, float(ball['kind'])))
+                         math.atan2(ball['vy'], ball['vx']), stretch, ripple,
+                         ball['kind'] + heart * HEART_FRACTION))
         self.balls = alive
         self.rows = rows + [self.EMPTY_ROW] * (self.SLOTS - len(rows))
+
+
+class Explosion:
+    """The gem bursts into shards that fill the picture, stay out turning and pulsing
+    with the beat, then come back together. Drops set it off, and so does a timer that
+    counts bars while the music is hitting hard, so it always starts on a new bar.
+
+    Every shard turns a whole number of times for each turn of the cloud, so when the
+    cloud's turn ends on a whole turn, all the shards are back in place too."""
+
+    def __init__(self):
+        self.time = None
+        self.amount = 0.0
+        self.start_amount = 0.0
+        self.turn = 0.0
+        self.way = 1.0
+        self.reform_turn = None
+        self.pulse = 0.0
+        self.since_pulse = math.inf
+        self.bars_since = 0
+        self.last_phase = None
+
+    @property
+    def running(self):
+        return self.time is not None
+
+    def start(self):
+        """Burst from wherever it is now, so a drop always gets its burst, even if the
+        shards were already out or on their way back."""
+        if self.amount <= 0.0:
+            self.way = random.choice((-1.0, 1.0))
+        self.time = 0.0
+        self.start_amount = self.amount
+        self.reform_turn = None
+        self.bars_since = 0
+
+    def _count_bars(self, bar_phase, intensity, cfg):
+        """Sets one off on the first frame of a bar, once it's been long enough."""
+        new_bar = self.last_phase is not None and self.last_phase - bar_phase > 0.5
+        self.last_phase = bar_phase
+        if not new_bar:
+            return
+        self.bars_since += 1
+        if (not self.running and self.bars_since >= cfg['explode_every_bars']
+                and intensity >= cfg['explode_min_intensity']):
+            self.start()
+
+    def _beat_pulse(self, step, beat, punch, max_flashes_per_sec, cfg):
+        """Each pulse brightens the shards, so very fast beats skip some to stay under
+        the flash limit. Quiet music pulses less, and silence not at all."""
+        self.since_pulse += step
+        self.pulse *= math.exp(-step / cfg['shard_pulse_release_sec'])
+        if beat and self.since_pulse >= 1.0 / max_flashes_per_sec:
+            self.pulse = max(self.pulse, punch)
+            self.since_pulse = 0.0
+
+    def _reform_turning(self, x, turn_speed, back_sec):
+        """Slows the cloud's turn to a stop on a whole turn as the shards come back."""
+        if self.reform_turn is None:
+            whole = 2.0 * math.pi
+            coast = turn_speed * back_sec * 0.5
+            turns = math.ceil((abs(self.turn) + coast) / whole - 0.1)
+            self.reform_turn = (self.turn, self.way * turns * whole)
+        start, end = self.reform_turn
+        self.turn = start + (end - start) * (1.0 - (1.0 - x) ** 2)
+
+    def update(self, step, bars_per_sec, beat_sec, beat, bar_phase, intensity, punch,
+               max_flashes_per_sec, cfg):
+        self._count_bars(bar_phase, intensity, cfg)
+        self._beat_pulse(step, beat, punch, max_flashes_per_sec, cfg)
+        if not self.running:
+            return
+        self.time += step
+        out_sec = cfg['explode_out_beats'] * beat_sec
+        hold_sec = cfg['explode_hold_beats'] * beat_sec
+        back_sec = cfg['explode_reform_beats'] * beat_sec
+        turn_speed = 2.0 * math.pi * cfg['shard_turns_per_bar'] * bars_per_sec
+        t = self.time
+        if t >= out_sec + hold_sec + back_sec:
+            self.time, self.amount, self.turn = None, 0.0, 0.0
+        elif t >= out_sec + hold_sec:
+            x = (t - out_sec - hold_sec) / back_sec
+            self.amount = 1.0 - _ease(x)
+            self._reform_turning(x, turn_speed, back_sec)
+        else:
+            self.turn += self.way * turn_speed * step
+            if t >= out_sec:
+                self.amount = 1.0
+            else:
+                burst = 1.0 - (1.0 - t / out_sec) ** 3
+                self.amount = self.start_amount + (1.0 - self.start_amount) * burst
 
 
 class CrystalMotion:
@@ -247,7 +346,7 @@ class CrystalMotion:
         self.moves = MoveVariation()
         self.sat_moves = MoveVariation()
         self.sat_sway_phase = 0.0
-        self.explode_time = None
+        self.explosion = Explosion()
         self.drop_was_up = False
         self.bass_follower = LevelFollower()
         self.loudness_follower = LevelFollower()
@@ -538,13 +637,13 @@ class CrystalMotion:
 
         self.gem_drop_clock += step * flow
         if (self.gem_drop_clock >= cfg['droplet_gem_interval_sec'] and shape['scale'] > 0.9
-                and self.explode_time is None and self.droplets.can_emit(cfg)):
+                and not self.explosion.running and self.droplets.can_emit(cfg)):
             self.gem_drop_clock = 0.0
             self._emit_from_gem(shape, cfg)
 
         out_sec = cfg['satellite_out_sec']
         formed = (self.sat_time is not None and out_sec <= self.sat_time <= out_sec + cfg['satellite_float_sec']
-                  and sat['sat_blob'] < 0.5 and self.explode_time is None)
+                  and sat['sat_blob'] < 0.5 and not self.explosion.running)
         if formed:
             self.sat_drop_clock += step * flow
             interval = {FIGURE_NUMBERS['laughing_face']: cfg['droplet_smiley_interval_sec'],
@@ -573,28 +672,8 @@ class CrystalMotion:
         amount = (ratio - cfg['punch_from']) / (cfg['punch_full_at'] - cfg['punch_from'])
         return min(max(amount, 0.0), 1.0)
 
-    def start_explosion(self):
-        """Start the explosion, unless one is already running."""
-        if self.explode_time is None:
-            self.explode_time = 0.0
-
-    def _explode_amount(self, step, beat_sec, cfg):
-        """How far apart the shards are: 0 is whole, 1 is fully blown apart.
-        They burst out quickly, then ease back together."""
-        if self.explode_time is None:
-            return 0.0
-        self.explode_time += step
-        out_sec = cfg['explode_out_beats'] * beat_sec
-        back_sec = cfg['explode_reform_beats'] * beat_sec
-        if self.explode_time < out_sec:
-            return 1.0 - (1.0 - self.explode_time / out_sec) ** 3
-        if self.explode_time < out_sec + back_sec:
-            x = (self.explode_time - out_sec) / back_sec
-            return 1.0 - x * x * (3.0 - 2.0 * x)
-        self.explode_time = None
-        return 0.0
-
-    def update(self, dt, bpm, beats_per_bar, bass, mids, treble, beat, drop, cfg):
+    def update(self, dt, bpm, beats_per_bar, bar_phase, bass, mids, treble, beat, drop,
+               max_flashes_per_sec, cfg):
         """Returns angle in degrees, spin_speed in degrees per second, sparkle
         from 0 to 1, and the channels the virtual crystal's shaders use."""
         step = min(dt, MAX_STEP_SEC)
@@ -622,8 +701,10 @@ class CrystalMotion:
 
         # Only the moment the flag goes up counts, not the whole time it's up.
         if drop and not self.drop_was_up:
-            self.start_explosion()
+            self.explosion.start()
         self.drop_was_up = drop
+        self.explosion.update(step, bars_per_sec, 60.0 / bpm, beat, bar_phase, intensity, punch,
+                              max_flashes_per_sec, cfg)
 
         shape = self._shape(step, cfg)
         sat = self._satellite(step, bars_per_sec, spin, intensity, punch, motion, cfg)
@@ -640,7 +721,9 @@ class CrystalMotion:
             'twist': self.kick * cfg['beat_twist_deg'] * punch,
             'sway_tilt': (math.sin(sway) * cfg['sway_deg'] * moves.sway_size + moves.tilt) * motion,
             'sway_roll': (math.cos(sway) * cfg['sway_deg'] * 0.7 * moves.sway_size + moves.roll) * motion,
-            'explode': self._explode_amount(step, 60.0 / bpm, cfg),
+            'explode': self.explosion.amount,
+            'shard_turn': self.explosion.turn,
+            'shard_pulse': self.explosion.pulse,
         }
 
 
@@ -680,7 +763,7 @@ def setting(*path):
 
 def explode_now():
     """Set off the explosion by hand, for testing it without waiting for a drop."""
-    _motion.start_explosion()
+    _motion.explosion.start()
 
 
 def change_shape_now():
@@ -721,11 +804,13 @@ def onCook(scriptOp):
             bpm = settings['audio']['fallback_bpm']
         _last_output = _motion.update(
             dt, bpm, settings['tempo']['beats_per_bar'],
+            _read('../tempo/tempo_out', 'bar_phase', 0.0),
             _read('../audio/audio_out', 'bass', 0.0),
             _read('../audio/audio_out', 'mids', 0.0),
             _read('../audio/audio_out', 'treble', 0.0),
             _read('../tempo/tempo_out', 'beat', 0.0) > 0.5,
             _read('../audio/audio_out', 'drop', 0.0) > 0.5,
+            settings['safety']['max_flashes_per_second'],
             settings['virtual_crystal'])
     except Exception as e:
         # Show the problem on the node, and keep outputting the last values.

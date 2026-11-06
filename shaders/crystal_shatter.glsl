@@ -4,11 +4,21 @@
 // is split into irregular cells. For each pixel, every nearby shard is moved back
 // to where it started; if that lands inside the shard's own cell, the pixel shows
 // that part of the gem. The cost only applies while the gem is apart.
+//
+// The gem can be drawn smaller than its explosion. As it bursts, it grows back to the
+// size the shards were cut for, so the explosion stays big whatever size the gem is.
 
 uniform float uExplode;        // 0 is whole, 1 is fully blown apart
-uniform float uShardSpread;    // how far shards fly: 1 takes the gem's edge to the picture's
+uniform float uGemShrink;      // the gem's size as a fraction of the size shards are cut for
+uniform float uShardSpread;    // how far shards fly: 1 takes the gem's edge to the corners
 uniform float uShardSize;      // shard size, in image heights
-uniform float uShardSpin;      // how many turns a shard makes at full spread
+uniform float uShardGrow;      // how much bigger a shard gets once it's out
+uniform float uShardSpin;      // how many turns a shard makes as it bursts out
+uniform float uShardTurn;      // how far the cloud of shards has turned, radians
+uniform float uShardSpinMax;   // the fastest a shard turns, in turns per turn of the cloud
+uniform float uShardPulse;     // the beat, fading from 1 to 0
+uniform float uShardPulseSize; // how much a beat swells the shards
+uniform float uShardPulseGlow; // how much a beat brightens the shards
 uniform float uBackgroundDim;  // brightness of the image behind the gem
 uniform float uShadow;         // how dark the halo around the gem is
 
@@ -57,39 +67,51 @@ vec2 nearestCell(vec2 q, out float edgeGap) {
     return best;
 }
 
-vec4 shatteredGem(vec2 p) {
-    int reach = int(ceil(GEM_REACH / uShardSize));
+vec4 shatteredGem(vec2 screen) {
+    // The space the shards were cut in. It starts at the gem's size and grows to full
+    // size, and the whole cloud of shards turns in it.
+    vec2 cut = screen / mix(uGemShrink, 1.0, uExplode);
+    float cloudC = cos(uShardTurn), cloudS = sin(uShardTurn);
+    vec2 p = vec2(cloudC * cut.x + cloudS * cut.y, cloudC * cut.y - cloudS * cut.x);
+    float pulse = uShardPulse * uExplode;
+
+    int reach = int(ceil(GEM_REACH / uGemShrink / uShardSize));
     for (int j = -reach; j <= reach; j++) {
         for (int i = -reach; i <= reach; i++) {
             vec2 cell = vec2(float(i), float(j));
             vec2 seed = seedOf(cell);
             vec2 random = hash2(cell + 17.0);
 
-            // The gem is stretched over the whole picture: shards from its edge reach the
-            // picture's edges and corners, and the ones in between fill the space. Each
-            // goes a different distance, so they don't keep the gem's shape.
-            vec2 fill = vec2(aspect * 0.5, 0.5) / GEM_RADIUS * uShardSpread;
+            // The gem is stretched into a circle that reaches the picture's corners, so
+            // the picture stays full as the cloud turns. Each shard goes a different
+            // distance, so they don't keep the gem's shape.
+            float fill = length(vec2(aspect * 0.5, 0.5)) / GEM_RADIUS * uShardSpread;
             vec2 away = (seed * fill * (0.75 + 0.5 * random.x) - seed) * uExplode;
-            float spin = (random.y - 0.5) * 6.28318 * uShardSpin * uExplode;
-            float scale = 1.0;
-            float c = cos(-spin), s = sin(-spin);
+            float scale = (1.0 + (uShardGrow - 1.0) * uExplode)
+                * (1.0 + uShardPulseSize * pulse * (0.6 + 0.8 * random.y));
             vec2 local = (p - seed - away) / scale;
             if (dot(local, local) > uShardSize * uShardSize * 3.0) {
                 continue;
             }
+            // A whole number of turns per turn of the cloud, so they all line up again.
+            float turns = (1.0 + floor(fract(random.x * 37.0) * uShardSpinMax))
+                * (fract(random.y * 53.0) > 0.5 ? 1.0 : -1.0);
+            float spin = (random.y - 0.5) * 6.28318 * uShardSpin * uExplode + turns * uShardTurn;
+            float c = cos(-spin), s = sin(-spin);
             vec2 q = vec2(c * local.x - s * local.y, s * local.x + c * local.y) + seed;
 
             float edgeGap;
             if (nearestCell(q, edgeGap) != cell) {
                 continue;
             }
-            vec4 color = texture(sTD2DInputs[0], toUV(q));
+            vec4 color = texture(sTD2DInputs[0], toUV(q * uGemShrink));
             if (color.a < 0.02) {
                 continue;
             }
             // The freshly broken edges catch the light.
             float glow = (1.0 - smoothstep(0.0, 0.012, edgeGap)) * uExplode;
             color.rgb += vec3(0.9, 0.95, 1.0) * glow * color.a;
+            color.rgb *= 1.0 + uShardPulseGlow * pulse;
             return color;
         }
     }
