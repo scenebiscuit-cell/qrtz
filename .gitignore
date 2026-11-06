@@ -11,6 +11,10 @@ loops/*
 images/*
 !images/.gitkeep
 
+# Third-party components; tox/vendor/README.md says where to get them
+tox/vendor/*
+!tox/vendor/README.md
+
 # Python and tools
 __pycache__/
 *.pyc
